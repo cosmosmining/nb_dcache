@@ -182,6 +182,9 @@ Regression modules: `test_stage1..4` (incremental bring-up), `test_random`
 `test_maint` (invalidate/flush), `test_coverage` (functional-coverage closure),
 `test_uvm` (the pyuvm suite).
 
+Latest sign-off results (lint / 32-test regression / coverage / formal /
+synthesis) are captured in [`results/SIGNOFF.md`](results/SIGNOFF.md).
+
 The Python tools live in `./.venv` (cocotb 2.x, pyuvm 4.x); the Makefiles put it
 on `PATH` automatically.
 

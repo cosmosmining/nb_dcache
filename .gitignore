@@ -12,3 +12,6 @@ formal/mshr_formal_sv2v.v
 # Synthesis
 synth/nb_dcache_synth.v
 synth/synth.log
+
+# Results: keep concise summaries, ignore bulky raw logs
+results/*_full.log

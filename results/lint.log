@@ -1,0 +1,7 @@
+=== LINT ===
+verilator --lint-only -Wall -sv -I/Users/chiungchen/Movies/nb_dcache/rtl /Users/chiungchen/Movies/nb_dcache/rtl/nb_dcache.vlt \
+		/Users/chiungchen/Movies/nb_dcache/rtl/nb_dcache_top.sv --top-module nb_dcache_top
+- V e r i l a t i o n   R e p o r t: Verilator 5.048 2026-04-26 rev vUNKNOWN-built20260426
+- Verilator: Built from 0.113 MB sources in 9 modules, into 0.485 MB in 3 C++ files needing 0.000 MB
+- Verilator: Walltime 0.064 s (elab=0.006, cvt=0.042, bld=0.000); cpu 0.060 s on 1 threads; allocated 22.391 MB
+LINT CLEAN

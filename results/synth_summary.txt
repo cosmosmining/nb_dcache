@@ -1,0 +1,17 @@
+=== top hierarchy (cells incl submodules) ===
+   499103 nb_dcache_top
+    43392 $paramod\nb_dcache_mshr\NWAIT=32'00000000000000000000000000001000
+     2575 $paramod\nb_dcache_replayq\DEPTH=32'00000000000000000000000000001000
+    10510 nb_dcache_axi
+   417748 nb_dcache_data_array
+       78 nb_dcache_maint
+    20145 nb_dcache_tag_array
+   342395 wires
+
+=== flat cell-type totals (generic mapped) ===
+   134472   $_DFFE_PP_
+     2884   $_DFF_PN0_
+        2   $_DFF_PN1_
+   253049   $_NAND_
+   232720   $_NOR_
+    37682   $_NOT_
