@@ -1,0 +1,14 @@
+# Python / cocotb
+.venv/
+__pycache__/
+tb/sim_build/
+tb/results.xml
+*.vcd
+
+# Formal
+formal/mshr_proofs*/
+formal/mshr_formal_sv2v.v
+
+# Synthesis
+synth/nb_dcache_synth.v
+synth/synth.log

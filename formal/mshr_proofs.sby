@@ -1,0 +1,21 @@
+[tasks]
+bmc
+cover
+
+[options]
+bmc:   mode bmc
+cover: mode cover
+depth 20
+
+[engines]
+smtbmc z3
+
+[script]
+# mshr_formal_sv2v.v is produced by sv2v from nb_dcache_pkg.sv +
+# nb_dcache_mshr.sv + mshr_formal.sv (yosys' native parser cannot handle the
+# rich SystemVerilog). Regenerate with `make formal` (top-level Makefile).
+read_verilog -formal mshr_formal_sv2v.v
+prep -top mshr_formal
+
+[files]
+mshr_formal_sv2v.v

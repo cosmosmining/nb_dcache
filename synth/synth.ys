@@ -1,0 +1,11 @@
+# Generic synthesis of nb_dcache_top (open-source yosys flow).
+# Input is sv2v-converted Verilog (yosys' native parser can't take the rich SV).
+# The tag/data/MSHR arrays use asynchronous reads, so yosys lowers them to
+# flip-flops here; in real silicon the tag and data arrays become SRAM macros
+# (see README "roadmap to silicon"). This run proves the design maps to gates
+# and reports cell area (control logic + storage).
+read_verilog -sv nb_dcache_synth.v
+hierarchy -top nb_dcache_top
+synth -top nb_dcache_top
+abc -g cmos2
+stat

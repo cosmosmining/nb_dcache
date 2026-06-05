@@ -1,0 +1,8 @@
+`verilator_config
+lint_off -rule UNUSEDSIGNAL -file "*nb_dcache_pkg.sv" -match "*Bits of function variable*"
+lint_off -rule UNUSEDSIGNAL -file "*nb_dcache_top.sv" -match "*Bits of function variable*"
+lint_off -rule UNUSEDSIGNAL -file "*nb_dcache_axi.sv" -match "*m_rid*"
+lint_off -rule UNUSEDSIGNAL -file "*nb_dcache_axi.sv" -match "*m_bid*"
+lint_off -rule UNUSEDPARAM  -file "*nb_dcache_pkg.sv"
+lint_off -rule UNUSEDSIGNAL -file "*nb_dcache_mshr.sv" -match "*fill_rsp_id*"
+lint_off -rule UNUSEDSIGNAL -file "*nb_dcache_mshr.sv" -match "*evict_done_id*"
