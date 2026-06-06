@@ -28,7 +28,8 @@ LINT_SRCS := \
 # coverage test closes functional coverage. Each runs in its OWN simulation so
 # per-test background tasks never cross-contaminate.
 MODULES := test_stage1 test_stage2 test_stage3 test_stage4 \
-           test_random test_errors test_maint test_coverage test_uvm
+           test_random test_errors test_maint test_throughput \
+           test_coverage test_uvm
 
 .PHONY: sim uvm lint formal synth clean
 

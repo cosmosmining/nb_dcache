@@ -6,7 +6,8 @@ bound SVA assertions, and SymbiYosys formal proofs.
 
 * 4-way set-associative, tree-pLRU replacement
 * **Synchronous-read, SRAM-mappable** tag/data arrays (way-parallel) with a
-  two-phase (address → decide) lookup
+  **pipelined lookup sustaining 1 hit/cycle** (address-prefetch → decide, with
+  a 1-deep write bypass)
 * Write-back, write-allocate
 * 4 MSHRs: **hit-under-miss** and **miss-under-miss**, with secondary-miss
   merging (per-word sub-entries), store-to-load forwarding in the fill window,
@@ -181,8 +182,8 @@ make synth     # sv2v + yosys generic synthesis, gate/area report
 
 Regression modules: `test_stage1..4` (incremental bring-up), `test_random`
 (constrained-random stress), `test_errors` (AXI bus-error propagation),
-`test_maint` (invalidate/flush), `test_coverage` (functional-coverage closure),
-`test_uvm` (the pyuvm suite).
+`test_maint` (invalidate/flush), `test_throughput` (1 hit/cycle pipelining),
+`test_coverage` (functional-coverage closure), `test_uvm` (the pyuvm suite).
 
 Latest sign-off results (lint / 32-test regression / coverage / formal /
 synthesis) are captured in [`results/SIGNOFF.md`](results/SIGNOFF.md).
@@ -209,28 +210,33 @@ block (incl. submodules, default 16 KiB geometry):
 | `nb_dcache_maint`      | ~0.05k | maintenance walker |
 | **top total** | **~20.4k cells + data SRAM** | vs ~670k when arrays were async-flops |
 
-Lookup is a **two-phase (address → decide), synchronous-read** sequence: the set
-is presented to the SRAM-style arrays in the address phase and the tag compare /
-victim / MSHR decision happens the next cycle on the registered reads. Reads
-(address phase) and writes (decide / refill) never collide, and a stalled decide
-simply re-reads, so a decision is never made on stale data. An SRAM-targeted
-backend (`memory_libmap`) maps the `$mem` to a compiled macro.
+Lookup is a **pipelined, synchronous-read** S1→S2 sequence sustaining
+**1 access/cycle** (proven by `test_throughput`: 64 back-to-back hits in 64
+cycles): S1 prefetches the next request's set while S2 decides the current one.
+Correctness under overlap is maintained by
+
+* a **1-deep write bypass** patching the one write a same-posedge read can miss
+  (previous commit's store data / dirty / victim invalidate),
+* a **stale re-read** of S2's set after any refill rewrites the arrays,
+* an **advance veto on hazard pushes** plus serialized replay execution, so
+  program order is never reordered past a stalled request.
+
+An SRAM-targeted backend (`memory_libmap`) maps the `$mem` to a compiled macro.
 
 Remaining roadmap to production silicon:
 
-1. **Pipeline the lookup to 1 access/cycle** with address→decide forwarding
-   (today it is a correct 2-cycle non-pipelined sequence).
-2. **Critical-word-first / early restart** on fills (lower miss latency).
-3. **ECC/parity on tag & data** + poison/scrub for RAS.
-4. **Power intent** (UPF, clock-gating on idle ways, SRAM light-sleep) and
+1. **Critical-word-first / early restart** on fills (lower miss latency).
+2. **ECC/parity on tag & data** + poison/scrub for RAS.
+3. **Power intent** (UPF, clock-gating on idle ways, SRAM light-sleep) and
    **DFT** (MBIST for the SRAMs, scan).
-5. **AXI compliance VIP** in regression; multi-seed CI; code/toggle coverage;
+4. **AXI compliance VIP** in regression; multi-seed CI; code/toggle coverage;
    gate-level sim with SDF.
-6. **Maintenance by line/set** and CSR/APB programming interface for the
+5. **Maintenance by line/set** and CSR/APB programming interface for the
    maintenance ops and performance counters.
 
 **Already implemented** (productization done in this repo):
-**synchronous-read SRAM-mappable tag/data arrays** with a two-phase lookup,
+**synchronous-read SRAM-mappable tag/data arrays** with a **1-access/cycle
+pipelined lookup** (write bypass + stale re-read + ordering guards),
 AXI4 **error propagation** (`RRESP/BRESP`→`cpu_rsp_err`, errored line not
 installed), full AXI4 **sideband**, **performance counters**, and
 **cache-maintenance** (invalidate-all / flush-all).

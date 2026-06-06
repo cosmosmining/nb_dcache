@@ -1,117 +1,117 @@
 sv2v -I/Users/chiungchen/Movies/nb_dcache/rtl /Users/chiungchen/Movies/nb_dcache/rtl/nb_dcache_pkg.sv /Users/chiungchen/Movies/nb_dcache/rtl/nb_dcache_mshr.sv \
 		formal/mshr_formal.sv > formal/mshr_formal_sv2v.v
 cd formal && sby -f mshr_proofs.sby
-SBY 20:43:39 [mshr_proofs_bmc] Removing directory '/Users/chiungchen/Movies/nb_dcache/formal/mshr_proofs_bmc'.
-SBY 20:43:39 [mshr_proofs_bmc] Copy '/Users/chiungchen/Movies/nb_dcache/formal/mshr_formal_sv2v.v' to '/Users/chiungchen/Movies/nb_dcache/formal/mshr_proofs_bmc/src/mshr_formal_sv2v.v'.
-SBY 20:43:39 [mshr_proofs_bmc] engine_0: smtbmc z3
-SBY 20:43:39 [mshr_proofs_cover] Removing directory '/Users/chiungchen/Movies/nb_dcache/formal/mshr_proofs_cover'.
-SBY 20:43:39 [mshr_proofs_cover] Copy '/Users/chiungchen/Movies/nb_dcache/formal/mshr_formal_sv2v.v' to '/Users/chiungchen/Movies/nb_dcache/formal/mshr_proofs_cover/src/mshr_formal_sv2v.v'.
-SBY 20:43:39 [mshr_proofs_cover] engine_0: smtbmc z3
-SBY 20:43:39 [mshr_proofs_bmc] base: starting process "cd mshr_proofs_bmc/src; yosys -ql ../model/design.log ../model/design.ys"
-SBY 20:43:39 [mshr_proofs_cover] base: starting process "cd mshr_proofs_cover/src; yosys -ql ../model/design.log ../model/design.ys"
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \w_fstrb with list of registers. See mshr_formal_sv2v.v:449
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \w_fdata with list of registers. See mshr_formal_sv2v.v:448
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \w_word with list of registers. See mshr_formal_sv2v.v:446
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \w_id with list of registers. See mshr_formal_sv2v.v:445
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \e_wstrb with list of registers. See mshr_formal_sv2v.v:377
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \e_wdata with list of registers. See mshr_formal_sv2v.v:376
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \w_tail with list of registers. See mshr_formal_sv2v.v:468, mshr_formal_sv2v.v:371
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \w_head with list of registers. See mshr_formal_sv2v.v:370
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \w_cnt with list of registers. See mshr_formal_sv2v.v:369
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \e_wbpend with list of registers. See mshr_formal_sv2v.v:368
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \e_err with list of registers. See mshr_formal_sv2v.v:367
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \e_mem with list of registers. See mshr_formal_sv2v.v:366
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \e_vline with list of registers. See mshr_formal_sv2v.v:365
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \e_vtag with list of registers. See mshr_formal_sv2v.v:364
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \e_way with list of registers. See mshr_formal_sv2v.v:363
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \e_set with list of registers. See mshr_formal_sv2v.v:362
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \e_tag with list of registers. See mshr_formal_sv2v.v:361
-SBY 20:43:39 [mshr_proofs_cover] base: Warning: Replacing memory \e_state with list of registers. See mshr_formal_sv2v.v:360
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \w_fstrb with list of registers. See mshr_formal_sv2v.v:449
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \w_fdata with list of registers. See mshr_formal_sv2v.v:448
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \w_word with list of registers. See mshr_formal_sv2v.v:446
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \w_id with list of registers. See mshr_formal_sv2v.v:445
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \e_wstrb with list of registers. See mshr_formal_sv2v.v:377
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \e_wdata with list of registers. See mshr_formal_sv2v.v:376
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \w_tail with list of registers. See mshr_formal_sv2v.v:468, mshr_formal_sv2v.v:371
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \w_head with list of registers. See mshr_formal_sv2v.v:370
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \w_cnt with list of registers. See mshr_formal_sv2v.v:369
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \e_wbpend with list of registers. See mshr_formal_sv2v.v:368
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \e_err with list of registers. See mshr_formal_sv2v.v:367
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \e_mem with list of registers. See mshr_formal_sv2v.v:366
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \e_vline with list of registers. See mshr_formal_sv2v.v:365
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \e_vtag with list of registers. See mshr_formal_sv2v.v:364
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \e_way with list of registers. See mshr_formal_sv2v.v:363
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \e_set with list of registers. See mshr_formal_sv2v.v:362
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \e_tag with list of registers. See mshr_formal_sv2v.v:361
-SBY 20:43:39 [mshr_proofs_bmc] base: Warning: Replacing memory \e_state with list of registers. See mshr_formal_sv2v.v:360
-SBY 20:43:43 [mshr_proofs_bmc] base: finished (returncode=0)
-SBY 20:43:43 [mshr_proofs_bmc] prep: starting process "cd mshr_proofs_bmc/model; yosys -ql design_prep.log design_prep.ys"
-SBY 20:43:43 [mshr_proofs_cover] base: finished (returncode=0)
-SBY 20:43:43 [mshr_proofs_cover] prep: starting process "cd mshr_proofs_cover/model; yosys -ql design_prep.log design_prep.ys"
-SBY 20:43:43 [mshr_proofs_bmc] prep: finished (returncode=0)
-SBY 20:43:43 [mshr_proofs_cover] prep: finished (returncode=0)
-SBY 20:43:43 [mshr_proofs_bmc] smt2: starting process "cd mshr_proofs_bmc/model; yosys -ql design_smt2.log design_smt2.ys"
-SBY 20:43:43 [mshr_proofs_cover] smt2: starting process "cd mshr_proofs_cover/model; yosys -ql design_smt2.log design_smt2.ys"
-SBY 20:43:43 [mshr_proofs_cover] smt2: finished (returncode=0)
-SBY 20:43:43 [mshr_proofs_bmc] smt2: finished (returncode=0)
-SBY 20:43:43 [mshr_proofs_cover] engine_0: starting process "cd mshr_proofs_cover; yosys-smtbmc -s z3 --presat -c --noprogress -t 20  --append 0 --dump-vcd engine_0/trace%.vcd --dump-yw engine_0/trace%.yw --dump-vlogtb engine_0/trace%_tb.v --dump-smtc engine_0/trace%.smtc model/design_smt2.smt2"
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: starting process "cd mshr_proofs_bmc; yosys-smtbmc -s z3 --presat --noprogress -t 20  --append 0 --dump-vcd engine_0/trace.vcd --dump-yw engine_0/trace.yw --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
-SBY 20:43:43 [mshr_proofs_cover] engine_0: ##   0:00:00  Solver: z3
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Solver: z3
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 0..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 0..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 1..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 1..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 2..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 2..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 3..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 3..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 4..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 4..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 5..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 5..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 6..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 6..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 7..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 7..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 8..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 8..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 9..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 9..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 10..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 10..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 11..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 11..
-SBY 20:43:43 [mshr_proofs_cover] engine_0: ##   0:00:00  Status: passed
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 12..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 12..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 13..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 13..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 14..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 14..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 15..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 15..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 16..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 16..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 17..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 17..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 18..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 18..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 19..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 19..
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: ##   0:00:00  Status: passed
-SBY 20:43:43 [mshr_proofs_cover] engine_0: finished (returncode=0)
-SBY 20:43:43 [mshr_proofs_cover] engine_0: Status returned by engine: pass
-SBY 20:43:43 [mshr_proofs_cover] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:04 (4)
-SBY 20:43:43 [mshr_proofs_cover] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:09 (9)
-SBY 20:43:43 [mshr_proofs_cover] summary: engine_0 (smtbmc z3) returned pass
-SBY 20:43:43 [mshr_proofs_cover] summary: engine_0 did not produce any traces
-SBY 20:43:43 [mshr_proofs_cover] DONE (PASS, rc=0)
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: finished (returncode=0)
-SBY 20:43:43 [mshr_proofs_bmc] engine_0: Status returned by engine: pass
-SBY 20:43:43 [mshr_proofs_bmc] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:04 (4)
-SBY 20:43:43 [mshr_proofs_bmc] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:09 (9)
-SBY 20:43:43 [mshr_proofs_bmc] summary: engine_0 (smtbmc z3) returned pass
-SBY 20:43:43 [mshr_proofs_bmc] summary: engine_0 did not produce any traces
-SBY 20:43:43 [mshr_proofs_bmc] DONE (PASS, rc=0)
+SBY 11:08:44 [mshr_proofs_bmc] Removing directory '/Users/chiungchen/Movies/nb_dcache/formal/mshr_proofs_bmc'.
+SBY 11:08:44 [mshr_proofs_bmc] Copy '/Users/chiungchen/Movies/nb_dcache/formal/mshr_formal_sv2v.v' to '/Users/chiungchen/Movies/nb_dcache/formal/mshr_proofs_bmc/src/mshr_formal_sv2v.v'.
+SBY 11:08:44 [mshr_proofs_bmc] engine_0: smtbmc z3
+SBY 11:08:44 [mshr_proofs_cover] Removing directory '/Users/chiungchen/Movies/nb_dcache/formal/mshr_proofs_cover'.
+SBY 11:08:44 [mshr_proofs_cover] Copy '/Users/chiungchen/Movies/nb_dcache/formal/mshr_formal_sv2v.v' to '/Users/chiungchen/Movies/nb_dcache/formal/mshr_proofs_cover/src/mshr_formal_sv2v.v'.
+SBY 11:08:44 [mshr_proofs_cover] engine_0: smtbmc z3
+SBY 11:08:44 [mshr_proofs_bmc] base: starting process "cd mshr_proofs_bmc/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY 11:08:44 [mshr_proofs_cover] base: starting process "cd mshr_proofs_cover/src; yosys -ql ../model/design.log ../model/design.ys"
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \w_fstrb with list of registers. See mshr_formal_sv2v.v:449
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \w_fdata with list of registers. See mshr_formal_sv2v.v:448
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \w_word with list of registers. See mshr_formal_sv2v.v:446
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \w_id with list of registers. See mshr_formal_sv2v.v:445
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \e_wstrb with list of registers. See mshr_formal_sv2v.v:377
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \e_wdata with list of registers. See mshr_formal_sv2v.v:376
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \w_tail with list of registers. See mshr_formal_sv2v.v:468, mshr_formal_sv2v.v:371
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \w_head with list of registers. See mshr_formal_sv2v.v:370
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \w_cnt with list of registers. See mshr_formal_sv2v.v:369
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \e_wbpend with list of registers. See mshr_formal_sv2v.v:368
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \e_err with list of registers. See mshr_formal_sv2v.v:367
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \e_mem with list of registers. See mshr_formal_sv2v.v:366
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \e_vline with list of registers. See mshr_formal_sv2v.v:365
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \e_vtag with list of registers. See mshr_formal_sv2v.v:364
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \e_way with list of registers. See mshr_formal_sv2v.v:363
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \e_set with list of registers. See mshr_formal_sv2v.v:362
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \e_tag with list of registers. See mshr_formal_sv2v.v:361
+SBY 11:08:44 [mshr_proofs_bmc] base: Warning: Replacing memory \e_state with list of registers. See mshr_formal_sv2v.v:360
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \w_fstrb with list of registers. See mshr_formal_sv2v.v:449
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \w_fdata with list of registers. See mshr_formal_sv2v.v:448
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \w_word with list of registers. See mshr_formal_sv2v.v:446
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \w_id with list of registers. See mshr_formal_sv2v.v:445
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \e_wstrb with list of registers. See mshr_formal_sv2v.v:377
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \e_wdata with list of registers. See mshr_formal_sv2v.v:376
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \w_tail with list of registers. See mshr_formal_sv2v.v:468, mshr_formal_sv2v.v:371
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \w_head with list of registers. See mshr_formal_sv2v.v:370
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \w_cnt with list of registers. See mshr_formal_sv2v.v:369
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \e_wbpend with list of registers. See mshr_formal_sv2v.v:368
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \e_err with list of registers. See mshr_formal_sv2v.v:367
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \e_mem with list of registers. See mshr_formal_sv2v.v:366
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \e_vline with list of registers. See mshr_formal_sv2v.v:365
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \e_vtag with list of registers. See mshr_formal_sv2v.v:364
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \e_way with list of registers. See mshr_formal_sv2v.v:363
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \e_set with list of registers. See mshr_formal_sv2v.v:362
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \e_tag with list of registers. See mshr_formal_sv2v.v:361
+SBY 11:08:44 [mshr_proofs_cover] base: Warning: Replacing memory \e_state with list of registers. See mshr_formal_sv2v.v:360
+SBY 11:08:47 [mshr_proofs_cover] base: finished (returncode=0)
+SBY 11:08:47 [mshr_proofs_cover] prep: starting process "cd mshr_proofs_cover/model; yosys -ql design_prep.log design_prep.ys"
+SBY 11:08:47 [mshr_proofs_bmc] base: finished (returncode=0)
+SBY 11:08:47 [mshr_proofs_bmc] prep: starting process "cd mshr_proofs_bmc/model; yosys -ql design_prep.log design_prep.ys"
+SBY 11:08:47 [mshr_proofs_cover] prep: finished (returncode=0)
+SBY 11:08:47 [mshr_proofs_bmc] prep: finished (returncode=0)
+SBY 11:08:47 [mshr_proofs_cover] smt2: starting process "cd mshr_proofs_cover/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY 11:08:47 [mshr_proofs_bmc] smt2: starting process "cd mshr_proofs_bmc/model; yosys -ql design_smt2.log design_smt2.ys"
+SBY 11:08:47 [mshr_proofs_cover] smt2: finished (returncode=0)
+SBY 11:08:47 [mshr_proofs_cover] engine_0: starting process "cd mshr_proofs_cover; yosys-smtbmc -s z3 --presat -c --noprogress -t 20  --append 0 --dump-vcd engine_0/trace%.vcd --dump-yw engine_0/trace%.yw --dump-vlogtb engine_0/trace%_tb.v --dump-smtc engine_0/trace%.smtc model/design_smt2.smt2"
+SBY 11:08:47 [mshr_proofs_bmc] smt2: finished (returncode=0)
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: starting process "cd mshr_proofs_bmc; yosys-smtbmc -s z3 --presat --noprogress -t 20  --append 0 --dump-vcd engine_0/trace.vcd --dump-yw engine_0/trace.yw --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY 11:08:47 [mshr_proofs_cover] engine_0: ##   0:00:00  Solver: z3
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Solver: z3
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 0..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 0..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 1..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 1..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 2..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 2..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 3..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 3..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 4..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 4..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 5..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 5..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 6..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 6..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 7..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 7..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 8..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 8..
+SBY 11:08:47 [mshr_proofs_cover] engine_0: ##   0:00:00  Status: passed
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 9..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 9..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 10..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 10..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 11..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 11..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 12..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 12..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 13..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 13..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 14..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 14..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 15..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 15..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 16..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 16..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 17..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 17..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 18..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 18..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assumptions in step 19..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Checking assertions in step 19..
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: ##   0:00:00  Status: passed
+SBY 11:08:47 [mshr_proofs_cover] engine_0: finished (returncode=0)
+SBY 11:08:47 [mshr_proofs_cover] engine_0: Status returned by engine: pass
+SBY 11:08:47 [mshr_proofs_cover] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:02 (2)
+SBY 11:08:47 [mshr_proofs_cover] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:06 (6)
+SBY 11:08:47 [mshr_proofs_cover] summary: engine_0 (smtbmc z3) returned pass
+SBY 11:08:47 [mshr_proofs_cover] summary: engine_0 did not produce any traces
+SBY 11:08:47 [mshr_proofs_cover] DONE (PASS, rc=0)
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: finished (returncode=0)
+SBY 11:08:47 [mshr_proofs_bmc] engine_0: Status returned by engine: pass
+SBY 11:08:47 [mshr_proofs_bmc] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:03 (3)
+SBY 11:08:47 [mshr_proofs_bmc] summary: Elapsed process time [H:MM:SS (secs)]: 0:00:06 (6)
+SBY 11:08:47 [mshr_proofs_bmc] summary: engine_0 (smtbmc z3) returned pass
+SBY 11:08:47 [mshr_proofs_bmc] summary: engine_0 did not produce any traces
+SBY 11:08:47 [mshr_proofs_bmc] DONE (PASS, rc=0)

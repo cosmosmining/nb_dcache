@@ -120,12 +120,27 @@ module nb_dcache_top
   assign in_set  = addr_set (in_req.addr);
 
   // ==========================================================================
-  // Two-phase lookup FSM
+  // Pipelined lookup: S1 (address/prefetch) -> S2 (decide), 1 request/cycle
   // ==========================================================================
-  typedef enum logic {L_ADDR, L_DECIDE} lstate_e;
-  lstate_e  lstate;
-  cpu_req_t s2_req;          // request under decision (read in L_ADDR)
-  logic     s2_from_replay;
+  // S2 holds the request under decision; S1 prefetches the next candidate's set
+  // so its registered read is ready the cycle S2 frees. Correctness rules:
+  //   * the tag/data view used by a decide was sampled exactly one rd_en ago;
+  //     the only write that sample can miss (the same-posedge lookup commit) is
+  //     patched by a 1-DEEP WRITE BYPASS, which any later fresh sample
+  //     supersedes (set on a commit-write, cleared by the next plain read);
+  //   * a refill (block_lookup) while S2 is occupied marks S2 STALE, forcing a
+  //     re-read of its set before deciding (refills rewrite tags/data);
+  //   * a hazard PUSH vetoes the same-cycle advance (the pushed request must
+  //     execute before anything younger), and replay-sourced requests run
+  //     serialized (S1 idle), preserving program order;
+  //   * if S2 stalls (response back-pressure), S1 does not prefetch, so the
+  //     held read register keeps S2's row.
+  // pLRU read may lag by one access (heuristic only; locked/valid/dirty views
+  // are bypass-corrected, so replacement safety is unaffected).
+  cpu_req_t s2_req;
+  logic     s2_valid, s2_from_replay, s2_stale;
+  logic     s2_done;          // S2 retires/consumed this cycle (driven below)
+  logic     rq_push_now;      // hazard push this cycle (vetoes advance)
 
   set_t  s2_set;  tag_t s2_tag;  woff_t s2_woff;
   assign s2_set  = addr_set (s2_req.addr);
@@ -139,15 +154,20 @@ module nb_dcache_top
 
   logic block_lookup;        // miss engine using shared ports (from MSHR)
 
-  // start a new lookup read this cycle?
-  logic lookup_start;
-  assign lookup_start = (lstate == L_ADDR) && in_valid &&
-                        !block_lookup && !maint_busy_w && !maint_req_valid;
+  // prefetch the candidate's set when S2 can take it next cycle
+  logic s1_fire, advance;
+  assign s1_fire = in_valid && !block_lookup && !maint_busy_w && !maint_req_valid
+                   && !s2_stale                      // stale refresh owns the port
+                   && !(from_replay && s2_valid)     // serialize replayed requests
+                   && (!s2_valid || s2_done);        // only if S2 frees
+  assign advance = s1_fire && !rq_push_now;          // a push closes the pipe
 
-  // shared array read address / enable (lookup address-phase or maintenance walk)
+  // shared array read address/enable: maintenance walk, stale refresh, or S1
   logic  arr_rd_en;  set_t arr_rd_set;
-  assign arr_rd_en  = maint_busy_w ? maint_read_req : lookup_start;
-  assign arr_rd_set = maint_busy_w ? maint_walk_set : in_set;
+  assign arr_rd_en  = maint_busy_w ? maint_read_req
+                                   : ((s2_stale && !block_lookup) || s1_fire);
+  assign arr_rd_set = maint_busy_w ? maint_walk_set
+                                   : (s2_stale ? s2_set : in_set);
 
   // ==========================================================================
   // Tag array (synchronous read)
@@ -195,13 +215,47 @@ module nb_dcache_top
   );
 
   // ==========================================================================
-  // Tag compare + victim selection (uses s2 + registered reads, in L_DECIDE)
+  // 1-deep write bypass + bypassed views of the registered reads
+  // ==========================================================================
+  // Captures the previous lookup commit's array writes (store-hit data,
+  // set-dirty, victim invalidate); the row/tag sample taken at that same
+  // posedge missed them (sync-RAM read-old), so S2 patches its view here. Any
+  // later plain read supersedes the bypass (the fresh sample includes the
+  // write), so it is cleared then.
+  logic      byp_d_v;   set_t byp_d_set;   way_t byp_d_way;
+  line_t     byp_d_line; linestrb_t byp_d_strb;
+  logic      byp_sd_v;  set_t byp_sd_set;  way_t byp_sd_way;
+  logic      byp_inv_v; set_t byp_inv_set; way_t byp_inv_way;
+
+  logic  valid_v [WAYS];
+  logic  dirty_v [WAYS];
+  line_t row_v   [WAYS];
+  always_comb begin
+    for (int w = 0; w < WAYS; w++) begin
+      valid_v[w] = ta_rd_valid[w];
+      dirty_v[w] = ta_rd_dirty[w];
+      row_v[w]   = da_rd_line[w];
+      if (byp_inv_v && byp_inv_set == s2_set && byp_inv_way == way_t'(w)) begin
+        valid_v[w] = 1'b0;
+        dirty_v[w] = 1'b0;
+      end
+      if (byp_sd_v && byp_sd_set == s2_set && byp_sd_way == way_t'(w))
+        dirty_v[w] = 1'b1;
+      if (byp_d_v && byp_d_set == s2_set && byp_d_way == way_t'(w))
+        for (int b = 0; b < LINE_BYTES; b++)
+          if (byp_d_strb[b])
+            row_v[w][b*8 +: 8] = byp_d_line[b*8 +: 8];
+    end
+  end
+
+  // ==========================================================================
+  // Tag compare + victim selection (uses s2 + bypassed views)
   // ==========================================================================
   logic hit;  way_t hit_way;
   always_comb begin
     hit = 1'b0; hit_way = '0;
     for (int w = 0; w < WAYS; w++)
-      if (ta_rd_valid[w] && ta_rd_tag[w] == s2_tag) begin
+      if (valid_v[w] && ta_rd_tag[w] == s2_tag) begin
         hit = 1'b1; hit_way = way_t'(w);
       end
   end
@@ -223,7 +277,7 @@ module nb_dcache_top
   end
 
   logic victim_dirty;
-  assign victim_dirty = ta_rd_valid[victim_way] && ta_rd_dirty[victim_way];
+  assign victim_dirty = valid_v[victim_way] && dirty_v[victim_way];
 
   // ==========================================================================
   // Miss engine (MSHR file)
@@ -260,7 +314,7 @@ module nb_dcache_top
 
     .alloc_en(alloc_fire), .alloc_set(s2_set), .alloc_tag(s2_tag),
     .alloc_way(victim_way), .alloc_need_evict(victim_dirty),
-    .alloc_vtag(ta_rd_tag[victim_way]), .alloc_vline(da_rd_line[victim_way]),
+    .alloc_vtag(ta_rd_tag[victim_way]), .alloc_vline(row_v[victim_way]),
     .alloc_w_id(s2_req.id), .alloc_w_isld(~s2_req.we), .alloc_w_word(s2_woff),
     .alloc_w_data(s2_req.wdata), .alloc_w_strb(s2_req.wstrb),
 
@@ -301,7 +355,7 @@ module nb_dcache_top
   // Maintenance engine
   // ==========================================================================
   logic quiesced;
-  assign quiesced = (dbg_mshr_occupancy == '0) && rq_empty && (lstate == L_ADDR);
+  assign quiesced = (dbg_mshr_occupancy == '0) && rq_empty && !s2_valid;
 
   nb_dcache_maint u_maint (
     .clk(clk), .rst_n(rst_n),
@@ -360,10 +414,10 @@ module nb_dcache_top
   );
 
   // ==========================================================================
-  // Decision (only in L_DECIDE, when the miss engine isn't using the ports)
+  // Decision (S2, when fresh and the miss engine isn't using the ports)
   // ==========================================================================
   logic process_req;
-  assign process_req = (lstate == L_DECIDE) && !block_lookup;
+  assign process_req = s2_valid && !block_lookup && !s2_stale && !maint_busy_w;
 
   logic hit_rsp_ready, hit_commit;
   assign hit_rsp_ready = cpu_rsp_ready;   // (block_lookup already excluded)
@@ -380,39 +434,73 @@ module nb_dcache_top
   assign alloc_fire = do_alloc;
   assign merge_fire = do_merge;
 
-  // a request is "consumed" (input accepted / head popped) on a successful commit
-  logic commit;
-  assign commit = hit_commit || do_merge || do_alloc || (do_hazard && !rq_full);
+  // hazard push (cpu-sourced only; replay-sourced hazards retry at the head)
+  assign rq_push_now = do_hazard && !s2_from_replay && !rq_full;
+
+  // S2 retires this cycle (committed, or absorbed into the replay queue)
+  assign s2_done = hit_commit || do_merge || do_alloc || rq_push_now;
 
   always_comb begin
-    rq_pop_en  = 1'b0;
-    rq_push_en = 1'b0;
-    if (s2_from_replay) begin
-      rq_pop_en = hit_commit || do_merge || do_alloc;  // hazard -> leave at head
-    end else begin
-      rq_push_en = do_hazard && !rq_full;              // cpu hazard -> enqueue
-    end
+    rq_pop_en  = s2_from_replay && (hit_commit || do_merge || do_alloc);
+    rq_push_en = rq_push_now;
   end
 
-  // CPU port accepts (in L_DECIDE) only for a cpu-sourced request that commits
-  assign cpu_req_ready = (lstate == L_DECIDE) && !s2_from_replay && commit;
+  // the CPU request is accepted when it advances into S2
+  assign cpu_req_ready = advance && !from_replay;
 
-  // ---- FSM sequencing -------------------------------------------------------
+  // ---- pipeline sequencing ---------------------------------------------------
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      lstate         <= L_ADDR;
+      s2_valid       <= 1'b0;
+      s2_stale       <= 1'b0;
       s2_req         <= '0;
       s2_from_replay <= 1'b0;
+      byp_d_v        <= 1'b0;
+      byp_sd_v       <= 1'b0;
+      byp_inv_v      <= 1'b0;
+      byp_d_set <= '0; byp_d_way <= '0; byp_d_line <= '0; byp_d_strb <= '0;
+      byp_sd_set <= '0; byp_sd_way <= '0; byp_inv_set <= '0; byp_inv_way <= '0;
     end else begin
-      unique case (lstate)
-        L_ADDR: if (lookup_start) begin
-                  s2_req         <= in_req;
-                  s2_from_replay <= from_replay;
-                  lstate         <= L_DECIDE;
-                end
-        L_DECIDE: lstate <= L_ADDR;   // always return; commit gated above
-        default:  lstate <= L_ADDR;
-      endcase
+      // advance / retire
+      if (advance) begin
+        s2_req         <= in_req;
+        s2_from_replay <= from_replay;
+        s2_valid       <= 1'b1;
+      end else if (s2_done) begin
+        s2_valid <= 1'b0;
+      end
+
+      // a refill may rewrite S2's set while it waits -> force a re-read
+      if (block_lookup && s2_valid)
+        s2_stale <= 1'b1;
+      else if (s2_stale && !block_lookup)
+        s2_stale <= 1'b0;            // refresh read issued this cycle
+
+      // 1-deep bypass: set on a lookup commit-write, superseded by the next
+      // plain read (whose sample already contains the write)
+      if (!block_lookup && da_wr_en) begin
+        byp_d_v    <= 1'b1;
+        byp_d_set  <= s2_set;
+        byp_d_way  <= hit_way;
+        byp_d_line <= st_line;
+        byp_d_strb <= st_strb;
+      end else if (arr_rd_en) begin
+        byp_d_v <= 1'b0;
+      end
+      if (sd_en) begin
+        byp_sd_v   <= 1'b1;
+        byp_sd_set <= sd_set;
+        byp_sd_way <= sd_way;
+      end else if (arr_rd_en) begin
+        byp_sd_v <= 1'b0;
+      end
+      if (inv_en) begin
+        byp_inv_v   <= 1'b1;
+        byp_inv_set <= inv_set;
+        byp_inv_way <= inv_way;
+      end else if (arr_rd_en) begin
+        byp_inv_v <= 1'b0;
+      end
     end
   end
 
@@ -472,7 +560,7 @@ module nb_dcache_top
 
   // ---- CPU response port ---------------------------------------------------
   data_t hit_rdata;
-  assign hit_rdata = da_rd_line[hit_way][s2_woff*DATA_WIDTH +: DATA_WIDTH];
+  assign hit_rdata = row_v[hit_way][s2_woff*DATA_WIDTH +: DATA_WIDTH];
 
   assign cpu_rsp_valid = block_lookup ? m_rsp_valid : do_hit;
   assign cpu_rsp_id    = block_lookup ? m_rsp_id    : s2_req.id;
@@ -484,7 +572,7 @@ module nb_dcache_top
   assign dbg_merge       = merge_fire;
   assign dbg_replay      = rq_push_en;
   assign dbg_evict_dirty = do_alloc && victim_dirty;
-  assign dbg_evict_clean = do_alloc && !victim_dirty && ta_rd_valid[victim_way];
+  assign dbg_evict_clean = do_alloc && !victim_dirty && valid_v[victim_way];
   assign dbg_hazard[0]   = do_hazard && !mshr_look_hit && mshr_look_full;
   assign dbg_hazard[1]   = do_hazard && !mshr_look_hit && !have_victim;
   assign dbg_hazard[2]   = do_hazard && !mshr_look_hit && mshr_look_wbc;
