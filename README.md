@@ -5,6 +5,8 @@ with a full open-source verification environment (Verilator + cocotb + pyuvm),
 bound SVA assertions, and SymbiYosys formal proofs.
 
 * 4-way set-associative, tree-pLRU replacement
+* **Synchronous-read, SRAM-mappable** tag/data arrays (way-parallel) with a
+  two-phase (address → decide) lookup
 * Write-back, write-allocate
 * 4 MSHRs: **hit-under-miss** and **miss-under-miss**, with secondary-miss
   merging (per-word sub-entries), store-to-load forwarding in the fill window,
@@ -66,8 +68,8 @@ Module split (`rtl/`):
 | File | Role |
 |------|------|
 | `nb_dcache_pkg.sv`        | parameters, types, address-field & pLRU helpers |
-| `nb_dcache_tag_array.sv`  | tag / valid / dirty + per-set tree-pLRU state |
-| `nb_dcache_data_array.sv` | line data RAM with per-byte write strobes |
+| `nb_dcache_tag_array.sv`  | tag / valid / dirty + per-set tree-pLRU (synchronous read) |
+| `nb_dcache_data_array.sv` | **SRAM-mappable** line data RAM: synchronous, way-parallel read, byte-write |
 | `nb_dcache_mshr.sv`       | **miss engine**: lookup, alloc, merge, AXI phases, refill+drain |
 | `nb_dcache_replayq.sv`    | replay FIFO (head-of-line) for structural hazards |
 | `nb_dcache_axi.sv`        | AXI4 master: burst fills/evicts, multi-outstanding, OoO R/B, error capture |
@@ -193,27 +195,31 @@ on `PATH` automatically.
 ## Synthesis & roadmap to production silicon
 
 `make synth` converts the RTL with `sv2v` and runs a generic yosys synthesis
-(`synth/synth.ys`) — it **maps to gates cleanly**. Representative generic-cell
-counts (default 16 KiB geometry):
+(`synth/synth.ys`). The tag/data arrays are **synchronous-read**, so the 16 KiB
+data array infers as a real **SRAM** (`$mem`) instead of flip-flops. Cells per
+block (incl. submodules, default 16 KiB geometry):
 
 | Block | Cells | Note |
 |-------|------:|------|
-| `data_array` | ~572k | 131 Kbit modeled as flops + read/write muxing — **must be 1 SRAM macro** |
-| `tag_array`  | ~21k  | 5.1 Kbit (tag+valid+dirty+pLRU) — **small SRAM / register file** |
-| `nb_dcache_mshr` | ~53k | control + waiter/merge storage (the real heart) |
-| `nb_dcache_axi`  | ~15k | burst engine + per-ID reassembly buffers |
-| `nb_dcache_replayq` | ~2.6k | replay FIFO |
-| **top total (flops)** | ~670k | dominated by storage-as-flops |
+| `nb_dcache_data_array` | ~2.3k + **1 SRAM** | 16 KiB (131072 b) as one `$mem` |
+| `nb_dcache_tag_array`  | ~5.4k | tag/valid/dirty/pLRU as flops (~5 Kbit) |
+| `nb_dcache_mshr`       | ~12.1k | MSHR file + waiter/merge storage |
+| `nb_dcache_axi`        | ~0.2k | (+ small per-ID buffers) |
+| `nb_dcache_replayq`    | ~0.05k | replay FIFO |
+| `nb_dcache_maint`      | ~0.05k | maintenance walker |
+| **top total** | **~20.4k cells + data SRAM** | vs ~670k when arrays were async-flops |
 
-The verified RTL deliberately models the tag/data arrays as **asynchronous-read
-register arrays** so the microarchitecture is simple and provable. That is the
-single biggest gap to tapeout. The honest roadmap to production silicon:
+Lookup is a **two-phase (address → decide), synchronous-read** sequence: the set
+is presented to the SRAM-style arrays in the address phase and the tag compare /
+victim / MSHR decision happens the next cycle on the registered reads. Reads
+(address phase) and writes (decide / refill) never collide, and a stalled decide
+simply re-reads, so a decision is never made on stale data. An SRAM-targeted
+backend (`memory_libmap`) maps the `$mem` to a compiled macro.
 
-1. **SRAM macros + registered-read pipeline** — replace the async-read arrays
-   with compiled single-/dual-port SRAM (1-cycle registered read). This turns
-   the single-cycle lookup into a tag-stage→data-stage pipeline; the MSHR/hit
-   forwarding already isolate most of the control so the change is localized to
-   the lookup pipe. With SRAM, logic shrinks to ~75k cells + 2 macros.
+Remaining roadmap to production silicon:
+
+1. **Pipeline the lookup to 1 access/cycle** with address→decide forwarding
+   (today it is a correct 2-cycle non-pipelined sequence).
 2. **Critical-word-first / early restart** on fills (lower miss latency).
 3. **ECC/parity on tag & data** + poison/scrub for RAS.
 4. **Power intent** (UPF, clock-gating on idle ways, SRAM light-sleep) and
@@ -224,10 +230,10 @@ single biggest gap to tapeout. The honest roadmap to production silicon:
    maintenance ops and performance counters.
 
 **Already implemented** (productization done in this repo):
+**synchronous-read SRAM-mappable tag/data arrays** with a two-phase lookup,
 AXI4 **error propagation** (`RRESP/BRESP`→`cpu_rsp_err`, errored line not
 installed), full AXI4 **sideband**, **performance counters**, and
-**cache-maintenance** (invalidate-all / flush-all). The **SRAM/pipeline rework
-(item 1)** is the main remaining engineering effort to tapeout.
+**cache-maintenance** (invalidate-all / flush-all).
 
 ## 12 interview questions this design answers
 

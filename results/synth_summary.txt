@@ -1,17 +1,17 @@
-=== top hierarchy (cells incl submodules) ===
-   499103 nb_dcache_top
-    43392 $paramod\nb_dcache_mshr\NWAIT=32'00000000000000000000000000001000
-     2575 $paramod\nb_dcache_replayq\DEPTH=32'00000000000000000000000000001000
-    10510 nb_dcache_axi
-   417748 nb_dcache_data_array
-       78 nb_dcache_maint
-    20145 nb_dcache_tag_array
-   342395 wires
+nb_dcache synthesis (yosys generic, sv2v front-end) -- SYNCHRONOUS-READ arrays
 
-=== flat cell-type totals (generic mapped) ===
-   134472   $_DFFE_PP_
-     2884   $_DFF_PN0_
-        2   $_DFF_PN1_
-   253049   $_NAND_
-   232720   $_NOR_
-    37682   $_NOT_
+Data array now infers as SRAM (synchronous read) instead of flip-flops:
+  nb_dcache_data_array: 1x $mem_v2 (16 KiB = 131072 bits) + read register + local logic
+
+Cells per block (incl. submodules):
+    20377 nb_dcache_top
+    12146 $paramod\nb_dcache_mshr\NWAIT=32'00000000000000000000000000001000
+       52 $paramod\nb_dcache_replayq\DEPTH=32'00000000000000000000000000001000
+      213 nb_dcache_axi
+     2310 nb_dcache_data_array
+       48 nb_dcache_maint
+     5446 nb_dcache_tag_array
+
+Inferred memories: data array (131072 b). Tag/valid/dirty/pLRU kept as
+flops (~5 Kbit, small). Total ~20.4k logic cells + 1 data SRAM, vs ~670k
+cells when the arrays were async-read flip-flops.
