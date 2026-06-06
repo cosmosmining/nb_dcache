@@ -1,13 +1,17 @@
 // ============================================================================
-// nb_dcache_tag_array.sv
+// nb_dcache_tag_array.sv  -- SYNCHRONOUS-READ tag / valid / dirty + pLRU
 // ----------------------------------------------------------------------------
-// Tag / valid / dirty state plus per-set tree-pLRU replacement state.
+// Tag/valid/dirty state plus per-set tree-pLRU replacement state, with a
+// SYNCHRONOUS (registered) read so its timing matches the data array and the
+// tag storage can map to SRAM:
 //
-// One combinational read port exposes an entire set (all WAYS) so the top can
-// do the parallel tag compare in the same cycle. Separate write ports update
-// metadata; conflicts to the same field are resolved by the priority documented
-// at each always_ff. Modeled as register arrays (small: NUM_LINES entries) so
-// it elaborates cleanly under Verilator and Yosys without vendor SRAM macros.
+//   cycle T   : drive rd_set, rd_en=1
+//   cycle T+1 : rd_tag/rd_valid/rd_dirty/rd_plru valid for that set (all ways)
+//
+// Writes (allocate / set-dirty / invalidate / pLRU touch) are synchronous; the
+// controller issues reads in the address phase and writes in the decide/refill
+// phase, so a read never collides with a write to the same set in the same cycle.
+// Conflicting writes to the same field are resolved by the documented priority.
 // ============================================================================
 `include "nb_dcache_pkg.sv"
 
@@ -17,7 +21,8 @@ module nb_dcache_tag_array
   input  logic                 clk,
   input  logic                 rst_n,
 
-  // --- combinational set read (tag compare happens in the consumer) ---------
+  // --- synchronous set read (all ways) --------------------------------------
+  input  logic                 rd_en,
   input  set_t                 rd_set,
   output tag_t                 rd_tag   [WAYS],
   output logic                 rd_valid [WAYS],
@@ -36,7 +41,7 @@ module nb_dcache_tag_array
   input  set_t                 setdirty_set,
   input  way_t                 setdirty_way,
 
-  // --- invalidate a way (e.g. external clear) -------------------------------
+  // --- invalidate a way -----------------------------------------------------
   input  logic                 inv_en,
   input  set_t                 inv_set,
   input  way_t                 inv_way,
@@ -53,21 +58,20 @@ module nb_dcache_tag_array
   logic                 dirty_q [NUM_SETS][WAYS];
   logic [PLRU_BITS-1:0] plru_q  [NUM_SETS];
 
-  // ---- combinational set read ----------------------------------------------
-  always_comb begin
-    for (int w = 0; w < WAYS; w++) begin
-      rd_tag[w]   = tag_q[rd_set][w];
-      rd_valid[w] = valid_q[rd_set][w];
-      rd_dirty[w] = dirty_q[rd_set][w];
+  // ---- synchronous read (registered outputs) -------------------------------
+  always_ff @(posedge clk) begin
+    if (rd_en) begin
+      for (int w = 0; w < WAYS; w++) begin
+        rd_tag[w]   <= tag_q[rd_set][w];
+        rd_valid[w] <= valid_q[rd_set][w];
+        rd_dirty[w] <= dirty_q[rd_set][w];
+      end
+      rd_plru <= plru_q[rd_set];
     end
-    rd_plru = plru_q[rd_set];
   end
 
   // ---- valid / tag / dirty update ------------------------------------------
-  // Priority for the dirty bit: allocate > set-dirty > invalidate. Allocate and
-  // invalidate never target the same way in the same cycle by construction
-  // (a refill and an external invalidate to the identical way are mutually
-  // exclusive in the top's control), but the priority makes the intent explicit.
+  // Priority for the dirty bit: allocate > set-dirty > invalidate.
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
       for (int s = 0; s < NUM_SETS; s++)

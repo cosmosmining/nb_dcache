@@ -45,21 +45,24 @@ file (`formal/mshr_formal.sv`), via sv2v + yosys + z3.
 
 See `results/formal.log`.
 
-## Synthesis — maps to gates
-`make synth` — sv2v → yosys generic synthesis (`synth/synth.ys`). Representative
-generic-cell counts (default 16 KiB geometry), `results/synth_summary.txt`:
+## Synthesis — SRAM-mappable (synchronous-read arrays)
+`make synth` — sv2v → yosys generic synthesis (`synth/synth.ys`). The arrays are
+now **synchronous-read**, so the data array infers as a real **memory** ($mem,
+SRAM-mappable) instead of flip-flops. Cells per block (incl. submodules),
+`results/synth_summary.txt`:
 
-| Block | Cells (incl. submodules) |
-|-------|------------------------:|
-| `nb_dcache_data_array` | ~417k (131 Kbit storage as flops — **→ SRAM macro**) |
-| `nb_dcache_tag_array`  | ~20k (**→ small SRAM**) |
-| `nb_dcache_mshr`       | ~43k |
-| `nb_dcache_axi`        | ~10.5k |
-| `nb_dcache_replayq`    | ~2.6k |
-| `nb_dcache_maint`      | ~0.1k |
-| **top total**          | ~499k (flop-modeled storage dominates) |
+| Block | Cells | Note |
+|-------|------:|------|
+| `nb_dcache_data_array` | ~2.3k + **1 SRAM** | 16 KiB (131072 b) as one `$mem` |
+| `nb_dcache_tag_array`  | ~5.4k | tag/valid/dirty/pLRU as flops (~5 Kbit) |
+| `nb_dcache_mshr`       | ~12.1k | MSHR file + waiter/merge storage |
+| `nb_dcache_axi`        | ~0.2k | (+ small per-ID buffers) |
+| `nb_dcache_replayq`    | ~0.05k |
+| `nb_dcache_maint`      | ~0.05k |
+| **top total**          | **~20.4k cells + data SRAM** |
 
-~150k flip-flops, of which 131,072 are the data array's 16 KiB modeled as
-flops. **Roadmap to silicon:** swap the async-read tag/data arrays for compiled
-SRAM macros + a registered-read pipeline, after which control logic is ~76k
-cells + 2 macros (see README "roadmap to production silicon").
+Compared with the earlier async-read register-file version (~670k cells, ~150k
+flip-flops), the 16 KiB data array is now a single SRAM-mappable memory. An
+SRAM-targeted backend (`memory_libmap`) maps the `$mem` to a compiled macro.
+Lookup is a two-phase (address → decide) non-pipelined sequence; pipelining to
+1 access/cycle with cross-phase forwarding is the next performance step.

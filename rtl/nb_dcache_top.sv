@@ -1,31 +1,25 @@
 // ============================================================================
-// nb_dcache_top.sv  -- non-blocking L1 data cache top
+// nb_dcache_top.sv  -- non-blocking L1 data cache top (SRAM / pipelined)
 // ----------------------------------------------------------------------------
-// Integrates the hit path with the MSHR miss engine, replay queue and AXI
-// engine. A single-cycle lookup pipeline serves one request per cycle from
-// either the replay queue (head-of-line, priority) or the CPU port.
+// The tag and data arrays are now SYNCHRONOUS-READ (SRAM-mappable), so lookup is
+// a two-phase, non-pipelined sequence per request:
 //
-// Per-request decision (when the engine is not using shared ports):
-//   tag hit                         -> service immediately (load/store), respond
-//   tag miss, MSHR hit, mergeable   -> merge as a secondary miss (no new MSHR)
-//   tag miss, no MSHR, way+slot free -> allocate a new MSHR (primary miss),
-//                                       invalidate the victim, kick off
-//                                       eviction (if dirty) + fill
-//   otherwise (structural hazard)   -> push to the replay queue
+//   L_ADDR   : present the request's set to the (way-parallel) tag & data
+//              arrays (rd_en=1) and latch the request into the s2 pipeline reg.
+//   L_DECIDE : the registered tag/data reads are valid; do the tag compare,
+//              victim/MSHR decision and commit (respond / store / alloc / merge /
+//              replay). Always returns to L_ADDR; the request is only *accepted*
+//              (cpu_req_ready / replay pop) on a successful commit, so a stall
+//              (response back-pressure, block_lookup, full replay queue) simply
+//              re-reads and retries -- the decision is never made on stale data.
 //
-// Shared-port arbitration: the miss engine raises block_lookup for the few
-// cycles it writes the refilled line / drains responses; the hit path stalls
-// then. During the long AXI latency block_lookup is low, so hits proceed
-// (hit-under-miss) and further misses allocate other MSHRs (miss-under-miss).
+// Because reads happen in L_ADDR and writes (store hit / refill) in L_DECIDE /
+// during block_lookup, a read never collides with a write to the same set in the
+// same cycle (no bypass needed). Throughput is one request per two cycles; the
+// next step toward a 1/cycle pipeline is forwarding across the two phases.
 //
-// Hazards handled explicitly (see also docs/README hazard table):
-//   * store-to-load forwarding in the fill window  -> MSHR per-word load snapshot
-//   * write merging into an in-flight MSHR         -> MSHR store merge
-//   * eviction targeting a set with a pending miss -> victim masked to unlocked
-//                                                     ways; victim invalidated at
-//                                                     alloc so the doomed line
-//                                                     cannot be hit mid-fill
-//   * re-access of a line whose write-back is in flight -> look_wb_conflict replay
+// Miss handling, hazards and AXI behavior are unchanged from the single-cycle
+// version (see the MSHR engine and the README hazard table).
 // ============================================================================
 `include "nb_dcache_pkg.sv"
 
@@ -54,7 +48,7 @@ module nb_dcache_top
   output logic                cpu_rsp_err,
 
   // ---- cache maintenance ----------------------------------------------------
-  input  logic                maint_req_valid,  // pulse to start (when idle)
+  input  logic                maint_req_valid,  // hold high until busy
   input  logic                maint_req_flush,  // 1=flush(WB)+inv, 0=invalidate
   output logic                maint_busy,
   output logic                maint_done,       // 1-cycle pulse on completion
@@ -83,13 +77,13 @@ module nb_dcache_top
 
   // ---- debug / functional-coverage bus (synthesizable, observation only) ----
   output logic [$clog2(MSHR_CNT+1)-1:0] dbg_mshr_occupancy,
-  output logic                          dbg_merge,        // a secondary miss merged
-  output logic                          dbg_replay,       // a request entered replayq
-  output logic                          dbg_evict_dirty,  // alloc with dirty write-back
-  output logic                          dbg_evict_clean,  // alloc replacing clean line
-  output logic [3:0]                    dbg_hazard,       // {mergewin,wbc,novictim,full}
+  output logic                          dbg_merge,
+  output logic                          dbg_replay,
+  output logic                          dbg_evict_dirty,
+  output logic                          dbg_evict_clean,
+  output logic [3:0]                    dbg_hazard,
 
-  // ---- performance counters (free-running; sample/clear externally) ---------
+  // ---- performance counters (free-running) ---------------------------------
   output logic [31:0]                   perf_hits,
   output logic [31:0]                   perf_misses,
   output logic [31:0]                   perf_replays,
@@ -122,13 +116,41 @@ module nb_dcache_top
   assign in_req      = from_replay ? rq_head_req : cpu_req;
   assign in_valid    = from_replay ? 1'b1 : cpu_req_valid;
 
-  set_t  in_set;  tag_t in_tag;  woff_t in_woff;
+  set_t  in_set;
   assign in_set  = addr_set (in_req.addr);
-  assign in_tag  = addr_tag (in_req.addr);
-  assign in_woff = addr_woff(in_req.addr);
 
   // ==========================================================================
-  // Tag array
+  // Two-phase lookup FSM
+  // ==========================================================================
+  typedef enum logic {L_ADDR, L_DECIDE} lstate_e;
+  lstate_e  lstate;
+  cpu_req_t s2_req;          // request under decision (read in L_ADDR)
+  logic     s2_from_replay;
+
+  set_t  s2_set;  tag_t s2_tag;  woff_t s2_woff;
+  assign s2_set  = addr_set (s2_req.addr);
+  assign s2_tag  = addr_tag (s2_req.addr);
+  assign s2_woff = addr_woff(s2_req.addr);
+
+  // maintenance taps (driven below)
+  logic  maint_busy_w, maint_inv_en, maint_read_req;
+  set_t  maint_walk_set;
+  way_t  maint_walk_way;
+
+  logic block_lookup;        // miss engine using shared ports (from MSHR)
+
+  // start a new lookup read this cycle?
+  logic lookup_start;
+  assign lookup_start = (lstate == L_ADDR) && in_valid &&
+                        !block_lookup && !maint_busy_w && !maint_req_valid;
+
+  // shared array read address / enable (lookup address-phase or maintenance walk)
+  logic  arr_rd_en;  set_t arr_rd_set;
+  assign arr_rd_en  = maint_busy_w ? maint_read_req : lookup_start;
+  assign arr_rd_set = maint_busy_w ? maint_walk_set : in_set;
+
+  // ==========================================================================
+  // Tag array (synchronous read)
   // ==========================================================================
   tag_t                 ta_rd_tag   [WAYS];
   logic                 ta_rd_valid [WAYS];
@@ -140,12 +162,6 @@ module nb_dcache_top
   logic inv_en;    set_t inv_set;   way_t inv_way;
   logic plru_en;   set_t plru_set;  way_t plru_way;
 
-  // maintenance engine taps (declared here, driven below)
-  logic  maint_busy_w, maint_inv_en;
-  set_t  maint_walk_set;
-  way_t  maint_walk_way;
-  set_t  rd_set_mux;   // tag/data read address (lookup or maintenance walk)
-  assign rd_set_mux = maint_busy_w ? maint_walk_set : in_set;
   // invalidate port: maintenance walk vs. primary-miss victim
   logic  ta_inv_en;  set_t ta_inv_set;  way_t ta_inv_way;
   assign ta_inv_en  = maint_busy_w ? maint_inv_en   : inv_en;
@@ -154,7 +170,8 @@ module nb_dcache_top
 
   nb_dcache_tag_array u_tags (
     .clk(clk), .rst_n(rst_n),
-    .rd_set(rd_set_mux), .rd_tag(ta_rd_tag), .rd_valid(ta_rd_valid),
+    .rd_en(arr_rd_en), .rd_set(arr_rd_set),
+    .rd_tag(ta_rd_tag), .rd_valid(ta_rd_valid),
     .rd_dirty(ta_rd_dirty), .rd_plru(ta_rd_plru),
     .alloc_en(alloc_en), .alloc_set(alloc_set), .alloc_way(alloc_way),
     .alloc_tag(alloc_tag), .alloc_dirty(alloc_dirty),
@@ -164,41 +181,35 @@ module nb_dcache_top
   );
 
   // ==========================================================================
-  // Data array
+  // Data array (synchronous, way-parallel read)
   // ==========================================================================
-  way_t      da_rd_way;
-  line_t     da_rd_line;
+  line_t     da_rd_line [WAYS];
   logic      da_wr_en;   set_t da_wr_set; way_t da_wr_way;
   line_t     da_wr_data; linestrb_t da_wr_strb;
 
-  way_t da_rd_way_mux;
-  assign da_rd_way_mux = maint_busy_w ? maint_walk_way : da_rd_way;
-
   nb_dcache_data_array u_data (
     .clk(clk),
-    .rd_set(rd_set_mux), .rd_way(da_rd_way_mux), .rd_line(da_rd_line),
+    .rd_en(arr_rd_en), .rd_set(arr_rd_set), .rd_line(da_rd_line),
     .wr_en(da_wr_en), .wr_set(da_wr_set), .wr_way(da_wr_way),
     .wr_data(da_wr_data), .wr_strb(da_wr_strb)
   );
 
   // ==========================================================================
-  // Tag compare + victim selection
+  // Tag compare + victim selection (uses s2 + registered reads, in L_DECIDE)
   // ==========================================================================
   logic hit;  way_t hit_way;
   always_comb begin
     hit = 1'b0; hit_way = '0;
     for (int w = 0; w < WAYS; w++)
-      if (ta_rd_valid[w] && ta_rd_tag[w] == in_tag) begin
+      if (ta_rd_valid[w] && ta_rd_tag[w] == s2_tag) begin
         hit = 1'b1; hit_way = way_t'(w);
       end
   end
 
-  // MSHR lookup wires
   logic            mshr_look_hit, mshr_look_merge, mshr_look_full, mshr_look_wbc;
   logic [IDXW-1:0] mshr_look_idx;
   logic [WAYS-1:0] mshr_locked;
 
-  // choose an unlocked victim, preferring the pLRU victim
   way_t victim_pref, victim_way;  logic have_victim;
   assign victim_pref = plru_victim(ta_rd_plru);
   always_comb begin
@@ -214,22 +225,16 @@ module nb_dcache_top
   logic victim_dirty;
   assign victim_dirty = ta_rd_valid[victim_way] && ta_rd_dirty[victim_way];
 
-  // data array read selects hit way (hit) or victim way (miss, to capture line)
-  assign da_rd_way = hit ? hit_way : victim_way;
-
   // ==========================================================================
   // Miss engine (MSHR file)
   // ==========================================================================
-  // mshr -> shared resource drivers
   logic      m_da_wr_en;   set_t m_da_wr_set; way_t m_da_wr_way;
   line_t     m_da_wr_data; linestrb_t m_da_wr_strb;
   logic      m_tag_alloc_en; set_t m_tag_alloc_set; way_t m_tag_alloc_way;
   tag_t      m_tag_alloc_tag; logic m_tag_alloc_dirty;
   logic      m_tag_plru_en; set_t m_tag_plru_set; way_t m_tag_plru_way;
   logic      m_rsp_valid; cpu_id_t m_rsp_id; data_t m_rsp_rdata; logic m_rsp_ready;
-  logic      block_lookup;
 
-  // mshr <-> AXI
   logic    fill_req_valid, fill_req_ready; axi_id_t fill_req_id; addr_t fill_req_addr;
   logic    fill_rsp_valid, fill_rsp_ready; axi_id_t fill_rsp_id; line_t fill_rsp_line;
   logic    fill_rsp_err;
@@ -237,34 +242,31 @@ module nb_dcache_top
   addr_t   evict_req_addr; line_t evict_req_line;
   logic    evict_done_valid, evict_done_ready; axi_id_t evict_done_id;
   logic    evict_done_err, m_rsp_err;
-  // MSHR's evict request (muxed with the maintenance engine's below)
   logic    mshr_evict_valid; axi_id_t mshr_evict_id;
   addr_t   mshr_evict_addr;  line_t mshr_evict_line;
-  // maintenance engine's evict request
   logic    maint_evict_valid; axi_id_t maint_evict_id;
   addr_t   maint_evict_addr;  line_t maint_evict_line;
 
-  // control: per-request actions (declared here, driven below)
   logic do_hit, do_merge, do_alloc, do_hazard;
   logic alloc_fire, merge_fire;
 
   nb_dcache_mshr #(.NWAIT(MSHR_NWAIT)) u_mshr (
     .clk(clk), .rst_n(rst_n),
-    .look_set(in_set), .look_tag(in_tag),
+    .look_set(s2_set), .look_tag(s2_tag),
     .look_hit(mshr_look_hit), .look_hit_mergeable(mshr_look_merge),
     .look_hit_idx(mshr_look_idx), .look_full(mshr_look_full),
     .look_locked_ways(mshr_locked), .look_wb_conflict(mshr_look_wbc),
     .dbg_occupancy(dbg_mshr_occupancy),
 
-    .alloc_en(alloc_fire), .alloc_set(in_set), .alloc_tag(in_tag),
+    .alloc_en(alloc_fire), .alloc_set(s2_set), .alloc_tag(s2_tag),
     .alloc_way(victim_way), .alloc_need_evict(victim_dirty),
-    .alloc_vtag(ta_rd_tag[victim_way]), .alloc_vline(da_rd_line),
-    .alloc_w_id(in_req.id), .alloc_w_isld(~in_req.we), .alloc_w_word(in_woff),
-    .alloc_w_data(in_req.wdata), .alloc_w_strb(in_req.wstrb),
+    .alloc_vtag(ta_rd_tag[victim_way]), .alloc_vline(da_rd_line[victim_way]),
+    .alloc_w_id(s2_req.id), .alloc_w_isld(~s2_req.we), .alloc_w_word(s2_woff),
+    .alloc_w_data(s2_req.wdata), .alloc_w_strb(s2_req.wstrb),
 
     .merge_en(merge_fire), .merge_idx(mshr_look_idx),
-    .merge_w_id(in_req.id), .merge_w_isld(~in_req.we), .merge_w_word(in_woff),
-    .merge_w_data(in_req.wdata), .merge_w_strb(in_req.wstrb),
+    .merge_w_id(s2_req.id), .merge_w_isld(~s2_req.we), .merge_w_word(s2_woff),
+    .merge_w_data(s2_req.wdata), .merge_w_strb(s2_req.wstrb),
 
     .da_wr_en(m_da_wr_en), .da_wr_set(m_da_wr_set), .da_wr_way(m_da_wr_way),
     .da_wr_data(m_da_wr_data), .da_wr_strb(m_da_wr_strb),
@@ -289,8 +291,7 @@ module nb_dcache_top
     .evict_done_id(evict_done_id)
   );
 
-  // evict port arbitration: the maintenance engine runs only when the cache is
-  // quiesced (no live MSHR), so a simple mux suffices.
+  // evict port arbitration (maintenance runs only when quiesced)
   assign evict_req_valid = maint_busy_w ? maint_evict_valid : mshr_evict_valid;
   assign evict_req_id    = maint_busy_w ? maint_evict_id    : mshr_evict_id;
   assign evict_req_addr  = maint_busy_w ? maint_evict_addr  : mshr_evict_addr;
@@ -300,17 +301,18 @@ module nb_dcache_top
   // Maintenance engine
   // ==========================================================================
   logic quiesced;
-  assign quiesced = (dbg_mshr_occupancy == '0) && rq_empty;
+  assign quiesced = (dbg_mshr_occupancy == '0) && rq_empty && (lstate == L_ADDR);
 
   nb_dcache_maint u_maint (
     .clk(clk), .rst_n(rst_n),
     .req_valid(maint_req_valid), .req_flush(maint_req_flush),
     .quiesced(quiesced), .busy(maint_busy_w), .done(maint_done),
+    .read_req(maint_read_req),
     .walk_set(maint_walk_set), .walk_way(maint_walk_way),
     .cur_valid(ta_rd_valid[maint_walk_way]),
     .cur_dirty(ta_rd_dirty[maint_walk_way]),
     .cur_tag(ta_rd_tag[maint_walk_way]),
-    .cur_line(da_rd_line),
+    .cur_line(da_rd_line[maint_walk_way]),
     .inv_en(maint_inv_en),
     .evict_valid(maint_evict_valid), .evict_ready(evict_req_ready),
     .evict_addr(maint_evict_addr), .evict_line(maint_evict_line),
@@ -323,7 +325,7 @@ module nb_dcache_top
   // ==========================================================================
   nb_dcache_replayq #(.DEPTH(REPLAY_DEPTH)) u_rq (
     .clk(clk), .rst_n(rst_n),
-    .push_en(rq_push_en), .push_req(in_req),
+    .push_en(rq_push_en), .push_req(s2_req),
     .pop_en(rq_pop_en),
     .head_valid(rq_head_valid), .head_req(rq_head_req),
     .full(rq_full), .empty(rq_empty)
@@ -358,14 +360,13 @@ module nb_dcache_top
   );
 
   // ==========================================================================
-  // Lookup decision
+  // Decision (only in L_DECIDE, when the miss engine isn't using the ports)
   // ==========================================================================
   logic process_req;
-  assign process_req = in_valid && !block_lookup && !maint_busy_w;
+  assign process_req = (lstate == L_DECIDE) && !block_lookup;
 
-  // hit-path response handshake (only when not blocked)
   logic hit_rsp_ready, hit_commit;
-  assign hit_rsp_ready = !block_lookup && cpu_rsp_ready;
+  assign hit_rsp_ready = cpu_rsp_ready;   // (block_lookup already excluded)
 
   always_comb begin
     do_hit    = process_req && hit;
@@ -376,43 +377,56 @@ module nb_dcache_top
   end
 
   assign hit_commit = do_hit && hit_rsp_ready;
-
-  // commit conditions: alloc/merge never need the response port (they retire
-  // later via drain), so they commit unconditionally once chosen.
   assign alloc_fire = do_alloc;
   assign merge_fire = do_merge;
 
-  // ---- replay queue push/pop -----------------------------------------------
+  // a request is "consumed" (input accepted / head popped) on a successful commit
+  logic commit;
+  assign commit = hit_commit || do_merge || do_alloc || (do_hazard && !rq_full);
+
   always_comb begin
     rq_pop_en  = 1'b0;
     rq_push_en = 1'b0;
-    if (from_replay) begin
-      // head retires (or merges/allocs) -> pop; hazard -> leave at head
-      rq_pop_en = hit_commit || do_merge || do_alloc;
+    if (s2_from_replay) begin
+      rq_pop_en = hit_commit || do_merge || do_alloc;  // hazard -> leave at head
     end else begin
-      // CPU-sourced hazard is absorbed into the replay queue
-      rq_push_en = do_hazard && !rq_full;
+      rq_push_en = do_hazard && !rq_full;              // cpu hazard -> enqueue
     end
   end
 
-  // CPU port accepts only when the replay queue is empty and the request
-  // actually makes progress this cycle.
-  assign cpu_req_ready = !from_replay &&
-                         (hit_commit || do_merge || do_alloc ||
-                          (do_hazard && !rq_full));
+  // CPU port accepts (in L_DECIDE) only for a cpu-sourced request that commits
+  assign cpu_req_ready = (lstate == L_DECIDE) && !s2_from_replay && commit;
+
+  // ---- FSM sequencing -------------------------------------------------------
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) begin
+      lstate         <= L_ADDR;
+      s2_req         <= '0;
+      s2_from_replay <= 1'b0;
+    end else begin
+      unique case (lstate)
+        L_ADDR: if (lookup_start) begin
+                  s2_req         <= in_req;
+                  s2_from_replay <= from_replay;
+                  lstate         <= L_DECIDE;
+                end
+        L_DECIDE: lstate <= L_ADDR;   // always return; commit gated above
+        default:  lstate <= L_ADDR;
+      endcase
+    end
+  end
 
   // ==========================================================================
   // Shared-resource muxing (miss engine has priority during block_lookup)
   // ==========================================================================
-  // ---- data array write ----------------------------------------------------
-  // hit store word placement
   line_t     st_line; linestrb_t st_strb;
   always_comb begin
     st_line = '0; st_strb = '0;
-    st_line[in_woff*DATA_WIDTH +: DATA_WIDTH] = in_req.wdata;
-    st_strb[in_woff*WORD_BYTES +: WORD_BYTES] = in_req.wstrb;
+    st_line[s2_woff*DATA_WIDTH +: DATA_WIDTH] = s2_req.wdata;
+    st_strb[s2_woff*WORD_BYTES +: WORD_BYTES] = s2_req.wstrb;
   end
 
+  // ---- data array write ----------------------------------------------------
   always_comb begin
     if (block_lookup) begin
       da_wr_en   = m_da_wr_en;
@@ -421,8 +435,8 @@ module nb_dcache_top
       da_wr_data = m_da_wr_data;
       da_wr_strb = m_da_wr_strb;
     end else begin
-      da_wr_en   = do_hit && in_req.we && hit_rsp_ready;
-      da_wr_set  = in_set;
+      da_wr_en   = do_hit && s2_req.we && hit_rsp_ready;
+      da_wr_set  = s2_set;
       da_wr_way  = hit_way;
       da_wr_data = st_line;
       da_wr_strb = st_strb;
@@ -431,43 +445,38 @@ module nb_dcache_top
 
   // ---- tag array update ----------------------------------------------------
   always_comb begin
-    // allocate (refill) only from the miss engine
     alloc_en    = block_lookup && m_tag_alloc_en;
     alloc_set   = m_tag_alloc_set;
     alloc_way   = m_tag_alloc_way;
     alloc_tag   = m_tag_alloc_tag;
     alloc_dirty = m_tag_alloc_dirty;
 
-    // invalidate the victim at primary-miss allocation
-    inv_en  = do_alloc;
-    inv_set = in_set;
+    inv_en  = do_alloc;          // invalidate the victim at primary-miss alloc
+    inv_set = s2_set;
     inv_way = victim_way;
 
-    // pLRU: refill touch (engine) or hit touch (lookup)
     if (block_lookup) begin
       plru_en  = m_tag_plru_en;
       plru_set = m_tag_plru_set;
       plru_way = m_tag_plru_way;
     end else begin
       plru_en  = hit_commit;
-      plru_set = in_set;
+      plru_set = s2_set;
       plru_way = hit_way;
     end
 
-    // set-dirty on a committed store hit
-    sd_en  = !block_lookup && do_hit && in_req.we && hit_rsp_ready;
-    sd_set = in_set;
+    sd_en  = !block_lookup && do_hit && s2_req.we && hit_rsp_ready;
+    sd_set = s2_set;
     sd_way = hit_way;
   end
 
   // ---- CPU response port ---------------------------------------------------
   data_t hit_rdata;
-  assign hit_rdata = da_rd_line[in_woff*DATA_WIDTH +: DATA_WIDTH];
+  assign hit_rdata = da_rd_line[hit_way][s2_woff*DATA_WIDTH +: DATA_WIDTH];
 
   assign cpu_rsp_valid = block_lookup ? m_rsp_valid : do_hit;
-  assign cpu_rsp_id    = block_lookup ? m_rsp_id    : in_req.id;
+  assign cpu_rsp_id    = block_lookup ? m_rsp_id    : s2_req.id;
   assign cpu_rsp_rdata = block_lookup ? m_rsp_rdata : hit_rdata;
-  // hits never error; a miss reports the fill's bus error to its waiters
   assign cpu_rsp_err   = block_lookup ? m_rsp_err   : 1'b0;
   assign m_rsp_ready   = block_lookup && cpu_rsp_ready;
 
@@ -493,11 +502,11 @@ module nb_dcache_top
       perf_writebacks <= '0;
       perf_bus_errors <= '0;
     end else begin
-      if (hit_commit)              perf_hits       <= perf_hits + 1'b1;
-      if (alloc_fire || merge_fire)perf_misses     <= perf_misses + 1'b1;
-      if (rq_push_en)              perf_replays    <= perf_replays + 1'b1;
-      if (dbg_evict_dirty)         perf_writebacks <= perf_writebacks + 1'b1;
-      if (bus_err_event)           perf_bus_errors <= perf_bus_errors + 1'b1;
+      if (hit_commit)               perf_hits       <= perf_hits + 1'b1;
+      if (alloc_fire || merge_fire) perf_misses     <= perf_misses + 1'b1;
+      if (rq_push_en)               perf_replays    <= perf_replays + 1'b1;
+      if (dbg_evict_dirty)          perf_writebacks <= perf_writebacks + 1'b1;
+      if (bus_err_event)            perf_bus_errors <= perf_bus_errors + 1'b1;
     end
   end
 
