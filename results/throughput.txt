@@ -1,0 +1,1 @@
+   930.00ns INFO     test                               hit throughput: 64 accepts in 64 cycles

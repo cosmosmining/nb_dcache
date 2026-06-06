@@ -1,1 +1,1 @@
-{'occupancy_bins': [0, 1, 2, 3, 4], 'merge': 290, 'replay': 210, 'evict_dirty': 174, 'evict_clean': 96, 'reorder': 324, 'hazard': {'mshr_full': 927, 'no_free_way': 32, 'wb_conflict': 195, 'merge_window': 2}}
+{'occupancy_bins': [0, 1, 2, 3, 4], 'merge': 318, 'replay': 213, 'evict_dirty': 173, 'evict_clean': 91, 'reorder': 307, 'hazard': {'mshr_full': 1536, 'no_free_way': 60, 'wb_conflict': 521, 'merge_window': 1}}

@@ -8,7 +8,7 @@ make synth`. Raw per-step summaries are alongside this file in `results/`.
 `make lint` → Verilator `-Wall` clean (intentional unused-bit cases waived in
 `rtl/nb_dcache.vlt`). See `results/lint.log`.
 
-## Simulation — 32/32 PASS (9 modules)
+## Simulation — 33/33 PASS (10 modules)
 `make sim`, each module in its own simulation, SVA bound (`--assert`).
 
 | Module | Tests | Result |
@@ -20,9 +20,10 @@ make synth`. Raw per-step summaries are alongside this file in `results/`.
 | test_random (constrained-random stress) | 4 | PASS |
 | test_errors (AXI bus-error propagation) | 2 | PASS |
 | test_maint (invalidate / flush) | 3 | PASS |
+| test_throughput (**1 hit/cycle**: 64 accepts in 64 cycles) | 1 | PASS |
 | test_coverage (functional-coverage closure) | 1 | PASS |
 | test_uvm (pyuvm suite) | 6 | PASS |
-| **Total** | **32** | **PASS** |
+| **Total** | **33** | **PASS** |
 
 See `results/sim_summary.txt`.
 
@@ -64,5 +65,11 @@ SRAM-mappable) instead of flip-flops. Cells per block (incl. submodules),
 Compared with the earlier async-read register-file version (~670k cells, ~150k
 flip-flops), the 16 KiB data array is now a single SRAM-mappable memory. An
 SRAM-targeted backend (`memory_libmap`) maps the `$mem` to a compiled macro.
-Lookup is a two-phase (address → decide) non-pipelined sequence; pipelining to
-1 access/cycle with cross-phase forwarding is the next performance step.
+
+## Pipelined lookup — 1 access/cycle
+The S1 (address-prefetch) → S2 (decide) pipeline sustains one hit per cycle,
+proven by `test_throughput` (64 back-to-back accepts in 64 cycles,
+`results/throughput.txt`). Overlap correctness comes from a 1-deep write bypass
+(previous commit's store/dirty/invalidate), a stale re-read of S2's set after
+refills, an advance veto on hazard pushes and serialized replay execution —
+all under the same SVA + scoreboard + formal checks.
